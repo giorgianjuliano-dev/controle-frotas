@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Circle, Polygon, useMapEvents, Marker } from "react-leaflet";
 import L from "leaflet";
@@ -172,6 +172,43 @@ export default function GeofencesPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof formData & { id: string }) => {
+      const { id, ...updateData } = data;
+      return apiRequest("PATCH", `/api/geofences/${id}`, updateData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/geofences"] });
+      toast({ title: "Geofence atualizada", description: "A geofence foi atualizada com sucesso." });
+      setEditingGeofence(null);
+      resetForm();
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível atualizar a geofence.", variant: "destructive" });
+    },
+  });
+
+  // Preencher formulário ao editar
+  useEffect(() => {
+    if (editingGeofence) {
+      setFormData({
+        name: editingGeofence.name,
+        description: editingGeofence.description || "",
+        type: editingGeofence.type,
+        active: editingGeofence.active,
+        center: editingGeofence.center,
+        radius: editingGeofence.radius || 500,
+        points: editingGeofence.points || [],
+        rules: editingGeofence.rules || [
+          { type: "entry", enabled: true, toleranceSeconds: 30 },
+          { type: "exit", enabled: true, toleranceSeconds: 30 },
+          { type: "dwell", enabled: false, dwellTimeMinutes: 30, toleranceSeconds: 30 },
+        ],
+        vehicleIds: editingGeofence.vehicleIds || [],
+      });
+    }
+  }, [editingGeofence]);
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -203,7 +240,12 @@ export default function GeofencesPage() {
       toast({ title: "Erro", description: "Desenhe ao menos 3 pontos para formar um polígono.", variant: "destructive" });
       return;
     }
-    createMutation.mutate(formData);
+    
+    if (editingGeofence) {
+      updateMutation.mutate({ ...formData, id: editingGeofence.id });
+    } else {
+      createMutation.mutate(formData);
+    }
   };
 
   const formatDate = (dateString: string | undefined) => {
@@ -399,13 +441,13 @@ export default function GeofencesPage() {
       </div>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col" style={{ zIndex: 1000 }}>
           <DialogHeader>
             <DialogTitle>Criar Nova Geofence</DialogTitle>
           </DialogHeader>
           
-          <div className="flex-1 flex gap-4 min-h-0">
-            <div className="w-[300px] flex-shrink-0 space-y-4 overflow-y-auto pr-2">
+          <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
+            <div className="w-[300px] flex-shrink-0 space-y-4 overflow-y-auto pr-2 relative z-[100] bg-background">
               <div className="space-y-2">
                 <Label htmlFor="name">Nome</Label>
                 <Input
@@ -538,11 +580,12 @@ export default function GeofencesPage() {
               </div>
             </div>
             
-            <div className="flex-1 rounded-lg overflow-hidden border">
+            <div className="flex-1 rounded-lg overflow-hidden border relative z-0 isolate">
               <MapContainer
                 center={[-23.5505, -46.6333]}
                 zoom={13}
-                className="h-full w-full"
+                className="h-full w-full geofence-dialog-map"
+                style={{ zIndex: 7 }}
                 zoomControl={true}
               >
                 <TileLayer
@@ -573,6 +616,181 @@ export default function GeofencesPage() {
             </Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-geofence">
               {createMutation.isPending ? "Salvando..." : "Salvar Geofence"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Edição */}
+      <Dialog open={!!editingGeofence} onOpenChange={(open) => { if (!open) { setEditingGeofence(null); resetForm(); } }}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col" style={{ zIndex: 1000 }}>
+          <DialogHeader>
+            <DialogTitle>Editar Geofence</DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
+            <div className="w-[300px] flex-shrink-0 space-y-4 overflow-y-auto pr-2 relative z-[100] bg-background">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Nome</Label>
+                <Input
+                  id="edit-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Ex: Depósito Central"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Descrição</Label>
+                <Textarea
+                  id="edit-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Descrição opcional"
+                  rows={2}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Tipo de Área</Label>
+                <Tabs value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v as "circle" | "polygon", center: undefined, points: [] })}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="circle" className="gap-2">
+                      <CircleIcon className="h-4 w-4" />
+                      Círculo
+                    </TabsTrigger>
+                    <TabsTrigger value="polygon" className="gap-2">
+                      <Pentagon className="h-4 w-4" />
+                      Polígono
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+              
+              {formData.type === "circle" && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-radius">Raio (metros)</Label>
+                  <Input
+                    id="edit-radius"
+                    type="number"
+                    value={formData.radius}
+                    onChange={(e) => setFormData({ ...formData, radius: parseInt(e.target.value) || 500 })}
+                    min={50}
+                    max={10000}
+                  />
+                </div>
+              )}
+              
+              <div className="space-y-3">
+                <Label>Regras de Alerta</Label>
+                
+                <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">Alertar entrada</span>
+                  </div>
+                  <Switch
+                    checked={formData.rules.find(r => r.type === "entry")?.enabled || false}
+                    onCheckedChange={(checked) => {
+                      setFormData({
+                        ...formData,
+                        rules: formData.rules.map(r => r.type === "entry" ? { ...r, enabled: checked } : r),
+                      });
+                    }}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-red-500" />
+                    <span className="text-sm">Alertar saída</span>
+                  </div>
+                  <Switch
+                    checked={formData.rules.find(r => r.type === "exit")?.enabled || false}
+                    onCheckedChange={(checked) => {
+                      setFormData({
+                        ...formData,
+                        rules: formData.rules.map(r => r.type === "exit" ? { ...r, enabled: checked } : r),
+                      });
+                    }}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm">Permanência prolongada</span>
+                  </div>
+                  <Switch
+                    checked={formData.rules.find(r => r.type === "dwell")?.enabled || false}
+                    onCheckedChange={(checked) => {
+                      setFormData({
+                        ...formData,
+                        rules: formData.rules.map(r => r.type === "dwell" ? { ...r, enabled: checked } : r),
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-tolerance">Tolerância (segundos)</Label>
+                <Input
+                  id="edit-tolerance"
+                  type="number"
+                  value={formData.rules[0]?.toleranceSeconds || 30}
+                  onChange={(e) => {
+                    const tolerance = parseInt(e.target.value) || 30;
+                    setFormData({
+                      ...formData,
+                      rules: formData.rules.map(r => ({ ...r, toleranceSeconds: tolerance })),
+                    });
+                  }}
+                  min={0}
+                  max={300}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ignora entradas/saídas que durarem menos que este tempo
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex-1 rounded-lg overflow-hidden border relative z-0 isolate">
+              <MapContainer
+                center={formData.center ? [formData.center.latitude, formData.center.longitude] : [-23.5505, -46.6333]}
+                zoom={13}
+                className="h-full w-full geofence-dialog-map"
+                style={{ zIndex: 7 }}
+                zoomControl={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <DrawingMap
+                  type={formData.type}
+                  center={formData.center}
+                  radius={formData.radius}
+                  points={formData.points}
+                  onCenterChange={(center) => setFormData({ ...formData, center })}
+                  onRadiusChange={(radius) => setFormData({ ...formData, radius })}
+                  onPointsChange={(points) => setFormData({ ...formData, points })}
+                />
+              </MapContainer>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <p className="text-xs text-muted-foreground mr-auto">
+              {formData.type === "circle" 
+                ? "Clique no mapa para definir o centro da área circular"
+                : "Clique no mapa para adicionar pontos do polígono"}
+            </p>
+            <Button variant="outline" onClick={() => { setEditingGeofence(null); resetForm(); }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmit} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </DialogFooter>
         </DialogContent>

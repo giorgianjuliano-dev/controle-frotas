@@ -6,7 +6,12 @@ import type {
   Trip, SpeedViolation, VehicleStats
 } from "@shared/schema";
 
+type VehicleUpdateCallback = (vehicles: Vehicle[]) => void;
+
 export interface IStorage {
+  // Callback para atualizações de veículos em tempo real
+  onVehicleUpdate(callback: VehicleUpdateCallback): () => void;
+  
   getVehicles(): Promise<Vehicle[]>;
   getVehicle(id: string): Promise<Vehicle | undefined>;
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
@@ -442,8 +447,6 @@ function generateSpeedStats(startDate: string, endDate: string): VehicleStats {
   };
 }
 
-type VehicleUpdateCallback = (vehicles: Vehicle[]) => void;
-
 export class MemStorage implements IStorage {
   private vehicles: Map<string, Vehicle>;
   private geofences: Map<string, Geofence>;
@@ -608,4 +611,27 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { isSupabaseConfigured } from "./lib/supabase";
+import { SupabaseStorage } from "./supabase-storage";
+
+// Função para criar o storage apropriado baseado na configuração
+function createStorage(): IStorage {
+  const storageType = process.env.STORAGE_TYPE || 'memory';
+  
+  if (storageType === 'supabase') {
+    if (!isSupabaseConfigured()) {
+      console.warn(
+        '⚠️  STORAGE_TYPE=supabase mas variáveis SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY não configuradas. ' +
+        'Usando armazenamento em memória.'
+      );
+      return new MemStorage();
+    }
+    console.log('✅ Usando Supabase como armazenamento');
+    return new SupabaseStorage();
+  }
+  
+  console.log('📦 Usando armazenamento em memória (dados simulados)');
+  return new MemStorage();
+}
+
+export const storage = createStorage();

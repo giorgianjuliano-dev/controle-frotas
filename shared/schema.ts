@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pgTable, text, integer, boolean, numeric, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
 
 export type VehicleStatus = "moving" | "stopped" | "idle" | "offline";
 export type IgnitionStatus = "on" | "off";
@@ -177,3 +178,90 @@ export const insertUserSchema = z.object({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = { id: string; username: string; password: string };
+
+// ============================================
+// Drizzle ORM Table Definitions for Supabase
+// ============================================
+
+export const vehiclesTable = pgTable("vehicles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  licensePlate: text("license_plate").notNull(),
+  model: text("model"),
+  status: text("status").notNull().default("offline"),
+  ignition: text("ignition").notNull().default("off"),
+  currentSpeed: integer("current_speed").notNull().default(0),
+  speedLimit: integer("speed_limit").notNull().default(80),
+  heading: integer("heading").notNull().default(0),
+  latitude: numeric("latitude", { precision: 10, scale: 7 }).notNull(),
+  longitude: numeric("longitude", { precision: 10, scale: 7 }).notNull(),
+  accuracy: numeric("accuracy", { precision: 5, scale: 2 }).notNull().default("5"),
+  lastUpdate: timestamp("last_update", { withTimezone: true }).notNull().defaultNow(),
+  batteryLevel: integer("battery_level"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const geofencesTable = pgTable("geofences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("circle"),
+  active: boolean("active").notNull().default(true),
+  center: jsonb("center").$type<{ latitude: number; longitude: number } | null>(),
+  radius: numeric("radius", { precision: 10, scale: 2 }),
+  points: jsonb("points").$type<Array<{ latitude: number; longitude: number }> | null>(),
+  rules: jsonb("rules").$type<GeofenceRule[]>().notNull().default([]),
+  vehicleIds: text("vehicle_ids").array().notNull().default([]),
+  lastTriggered: timestamp("last_triggered", { withTimezone: true }),
+  color: text("color"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const alertsTable = pgTable("alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  type: text("type").notNull(),
+  priority: text("priority").notNull(),
+  vehicleId: text("vehicle_id").notNull(),
+  vehicleName: text("vehicle_name").notNull(),
+  message: text("message").notNull(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+  read: boolean("read").notNull().default(false),
+  latitude: numeric("latitude", { precision: 10, scale: 7 }),
+  longitude: numeric("longitude", { precision: 10, scale: 7 }),
+  speed: integer("speed"),
+  speedLimit: integer("speed_limit"),
+  geofenceName: text("geofence_name"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const tripsTable = pgTable("trips", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  vehicleId: text("vehicle_id").notNull(),
+  startTime: timestamp("start_time", { withTimezone: true }).notNull(),
+  endTime: timestamp("end_time", { withTimezone: true }).notNull(),
+  totalDistance: numeric("total_distance", { precision: 12, scale: 2 }).notNull(),
+  travelTime: numeric("travel_time", { precision: 10, scale: 2 }).notNull(),
+  stoppedTime: numeric("stopped_time", { precision: 10, scale: 2 }).notNull(),
+  averageSpeed: numeric("average_speed", { precision: 6, scale: 2 }).notNull(),
+  maxSpeed: numeric("max_speed", { precision: 6, scale: 2 }).notNull(),
+  stopsCount: integer("stops_count").notNull().default(0),
+  points: jsonb("points").$type<LocationPoint[]>().notNull().default([]),
+  events: jsonb("events").$type<RouteEvent[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const speedViolationsTable = pgTable("speed_violations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  vehicleId: text("vehicle_id").notNull(),
+  vehicleName: text("vehicle_name").notNull(),
+  speed: integer("speed").notNull(),
+  speedLimit: integer("speed_limit").notNull(),
+  excessSpeed: integer("excess_speed").notNull(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+  latitude: numeric("latitude", { precision: 10, scale: 7 }).notNull(),
+  longitude: numeric("longitude", { precision: 10, scale: 7 }).notNull(),
+  duration: integer("duration").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

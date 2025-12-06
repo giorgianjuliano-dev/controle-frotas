@@ -229,6 +229,53 @@
     font-family: var(--font-sans);
   }
 
+  .geofence-dialog-map {
+    position: relative;
+    isolation: isolate;
+    z-index: 7;
+  }
+
+  .geofence-dialog-map .leaflet-pane {
+    z-index: 0 !important;
+  }
+
+  .geofence-dialog-map .leaflet-overlay-pane,
+  .geofence-dialog-map .leaflet-marker-pane,
+  .geofence-dialog-map .leaflet-shadow-pane,
+  .geofence-dialog-map .leaflet-tooltip-pane,
+  .geofence-dialog-map .leaflet-popup-pane {
+    z-index: 1 !important;
+  }
+
+  .geofence-dialog-map .leaflet-top,
+  .geofence-dialog-map .leaflet-bottom,
+  .geofence-dialog-map .leaflet-control {
+    z-index: 2 !important;
+  }
+
+  /* Fix Leaflet z-index inside dialogs/modals */
+  [role="dialog"] .leaflet-container,
+  [data-radix-dialog-content] .leaflet-container {
+    z-index: 0 !important;
+  }
+
+  [role="dialog"] .leaflet-pane,
+  [data-radix-dialog-content] .leaflet-pane {
+    z-index: 0 !important;
+  }
+
+  [role="dialog"] .leaflet-top,
+  [role="dialog"] .leaflet-bottom,
+  [data-radix-dialog-content] .leaflet-top,
+  [data-radix-dialog-content] .leaflet-bottom {
+    z-index: 1 !important;
+  }
+
+  [role="dialog"] .leaflet-control,
+  [data-radix-dialog-content] .leaflet-control {
+    z-index: 1 !important;
+  }
+
   /* Pulse animation for live markers */
   @keyframes pulse-ring {
     0% {

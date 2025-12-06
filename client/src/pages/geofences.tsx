@@ -248,6 +248,42 @@ export default function GeofencesPage() {
     }
   };
 
+  const handleUpdateSubmit = () => {
+    if (!editingGeofence) return;
+    if (!formData.name) {
+      toast({ title: "Erro", description: "Digite um nome para a geofence.", variant: "destructive" });
+      return;
+    }
+    if (formData.type === "circle" && !formData.center) {
+      toast({ title: "Erro", description: "Clique no mapa para definir o centro da área.", variant: "destructive" });
+      return;
+    }
+    if (formData.type === "polygon" && formData.points.length < 3) {
+      toast({ title: "Erro", description: "Desenhe ao menos 3 pontos para formar um polígono.", variant: "destructive" });
+      return;
+    }
+    updateMutation.mutate({ id: editingGeofence.id, data: formData });
+  };
+
+  const openEditDialog = (geofence: Geofence) => {
+    setFormData({
+      name: geofence.name,
+      description: geofence.description || "",
+      type: geofence.type,
+      active: geofence.active,
+      center: geofence.center,
+      radius: geofence.radius || 500,
+      points: geofence.points || [],
+      rules: geofence.rules.length > 0 ? geofence.rules : [
+        { type: "entry", enabled: true, toleranceSeconds: 30 },
+        { type: "exit", enabled: true, toleranceSeconds: 30 },
+        { type: "dwell", enabled: false, dwellTimeMinutes: 30, toleranceSeconds: 30 },
+      ],
+      vehicleIds: geofence.vehicleIds,
+    });
+    setEditingGeofence(geofence);
+  };
+
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return "Nunca";
     return new Date(dateString).toLocaleDateString("pt-BR", {
@@ -338,7 +374,7 @@ export default function GeofencesPage() {
                         className="h-8"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setEditingGeofence(geofence);
+                          openEditDialog(geofence);
                         }}
                         data-testid={`edit-${geofence.id}`}
                       >

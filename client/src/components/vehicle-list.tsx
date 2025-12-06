@@ -1,10 +1,22 @@
 import { useState } from "react";
-import { Search, Truck, MapPin, Gauge, AlertTriangle, Signal, SignalZero } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { Search, Truck, MapPin, Gauge, AlertTriangle, Signal, SignalZero, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import type { Vehicle } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Vehicle, InsertVehicle } from "@shared/schema";
 
 type FilterType = "all" | "moving" | "stopped" | "alerts" | "offline";
 
@@ -16,8 +28,71 @@ interface VehicleListProps {
 }
 
 export function VehicleList({ vehicles, selectedVehicleId, onSelectVehicle, isLoading }: VehicleListProps) {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [formData, setFormData] = useState<Partial<InsertVehicle>>({
+    name: "",
+    licensePlate: "",
+    model: "",
+    status: "offline",
+    ignition: "off",
+    currentSpeed: 0,
+    speedLimit: 80,
+    heading: 0,
+    latitude: -23.5505,
+    longitude: -46.6333,
+    accuracy: 5,
+    lastUpdate: new Date().toISOString(),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: InsertVehicle) => {
+      return apiRequest("POST", "/api/vehicles", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      toast({ title: "Veículo criado", description: "O novo veículo foi cadastrado com sucesso." });
+      setIsCreateOpen(false);
+      resetForm();
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível criar o veículo.", variant: "destructive" });
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      licensePlate: "",
+      model: "",
+      status: "offline",
+      ignition: "off",
+      currentSpeed: 0,
+      speedLimit: 80,
+      heading: 0,
+      latitude: -23.5505,
+      longitude: -46.6333,
+      accuracy: 5,
+      lastUpdate: new Date().toISOString(),
+    });
+  };
+
+  const handleCreateSubmit = () => {
+    if (!formData.name) {
+      toast({ title: "Erro", description: "Digite um nome para o veículo.", variant: "destructive" });
+      return;
+    }
+    if (!formData.licensePlate) {
+      toast({ title: "Erro", description: "Digite a placa do veículo.", variant: "destructive" });
+      return;
+    }
+    createMutation.mutate({
+      ...formData,
+      lastUpdate: new Date().toISOString(),
+    } as InsertVehicle);
+  };
 
   const filters: { key: FilterType; label: string; count: number }[] = [
     { key: "all", label: "Todos", count: vehicles.length },
@@ -98,15 +173,24 @@ export function VehicleList({ vehicles, selectedVehicleId, onSelectVehicle, isLo
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 space-y-4 border-b border-sidebar-border">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar veículo..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-vehicle"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar veículo..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-vehicle"
+            />
+          </div>
+          <Button 
+            size="icon" 
+            onClick={() => setIsCreateOpen(true)}
+            data-testid="button-create-vehicle"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
         
         <div className="flex flex-wrap gap-2">
@@ -194,6 +278,102 @@ export function VehicleList({ vehicles, selectedVehicleId, onSelectVehicle, isLo
           )}
         </div>
       </ScrollArea>
+
+      {/* Dialog de Criação de Veículo */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Novo Veículo</DialogTitle>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome *</Label>
+                <Input
+                  id="name"
+                  value={formData.name || ""}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Ex: Caminhão 01"
+                  data-testid="input-vehicle-name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="licensePlate">Placa *</Label>
+                <Input
+                  id="licensePlate"
+                  value={formData.licensePlate || ""}
+                  onChange={(e) => setFormData({ ...formData, licensePlate: e.target.value })}
+                  placeholder="Ex: ABC-1234"
+                  data-testid="input-vehicle-plate"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="model">Modelo</Label>
+                <Input
+                  id="model"
+                  value={formData.model || ""}
+                  onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                  placeholder="Ex: Mercedes Actros"
+                  data-testid="input-vehicle-model"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="speedLimit">Limite de Velocidade (km/h)</Label>
+                <Input
+                  id="speedLimit"
+                  type="number"
+                  value={formData.speedLimit || 80}
+                  onChange={(e) => setFormData({ ...formData, speedLimit: parseInt(e.target.value) || 80 })}
+                  min={20}
+                  max={180}
+                  data-testid="input-vehicle-speed-limit"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="latitude">Latitude</Label>
+                <Input
+                  id="latitude"
+                  type="number"
+                  step="0.0001"
+                  value={formData.latitude || -23.5505}
+                  onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) || -23.5505 })}
+                  data-testid="input-vehicle-latitude"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="longitude">Longitude</Label>
+                <Input
+                  id="longitude"
+                  type="number"
+                  step="0.0001"
+                  value={formData.longitude || -46.6333}
+                  onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) || -46.6333 })}
+                  data-testid="input-vehicle-longitude"
+                />
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsCreateOpen(false); resetForm(); }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateSubmit} disabled={createMutation.isPending} data-testid="button-save-vehicle">
+              {createMutation.isPending ? "Salvando..." : "Criar Veículo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

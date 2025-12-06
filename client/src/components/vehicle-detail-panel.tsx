@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { 
   X, MapPin, Gauge, Navigation, Radio, Battery, Clock, 
-  History, Shield, AlertTriangle, Bell, Activity, Settings
+  History, Shield, AlertTriangle, Bell, Activity, Settings,
+  Edit2, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +11,28 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Vehicle, Alert } from "@shared/schema";
 import { Link } from "wouter";
 
@@ -22,8 +45,79 @@ interface VehicleDetailPanelProps {
 }
 
 export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, isFollowing }: VehicleDetailPanelProps) {
+  const { toast } = useToast();
   const vehicleAlerts = alerts.filter(a => a.vehicleId === vehicle.id);
   const unreadAlerts = vehicleAlerts.filter(a => !a.read);
+  
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: vehicle.name,
+    licensePlate: vehicle.licensePlate,
+    model: vehicle.model || "",
+    speedLimit: vehicle.speedLimit,
+    latitude: vehicle.latitude,
+    longitude: vehicle.longitude,
+  });
+
+  // Atualizar formData quando vehicle mudar
+  useEffect(() => {
+    setFormData({
+      name: vehicle.name,
+      licensePlate: vehicle.licensePlate,
+      model: vehicle.model || "",
+      speedLimit: vehicle.speedLimit,
+      latitude: vehicle.latitude,
+      longitude: vehicle.longitude,
+    });
+  }, [vehicle]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: Partial<Vehicle>) => {
+      return apiRequest("PATCH", `/api/vehicles/${vehicle.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      toast({ title: "Veículo atualizado", description: "As alterações foram salvas com sucesso." });
+      setIsEditOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível atualizar o veículo.", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/vehicles/${vehicle.id}`);
+    },
+    onSuccess: () => {
+      // Primeiro fecha o painel e o dialog antes de invalidar a query
+      // para evitar renderização com dados inconsistentes
+      onClose();
+      setIsDeleteOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      toast({ title: "Veículo excluído", description: "O veículo foi removido com sucesso." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível excluir o veículo.", variant: "destructive" });
+    },
+  });
+
+  const handleEditSubmit = () => {
+    if (!formData.name) {
+      toast({ title: "Erro", description: "Digite um nome para o veículo.", variant: "destructive" });
+      return;
+    }
+    if (!formData.licensePlate) {
+      toast({ title: "Erro", description: "Digite a placa do veículo.", variant: "destructive" });
+      return;
+    }
+    updateMutation.mutate(formData);
+  };
+
+  const handleDelete = () => {
+    deleteMutation.mutate();
+  };
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -83,9 +177,28 @@ export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, 
           <h2 className="font-semibold text-lg">{vehicle.name}</h2>
           <p className="text-sm text-muted-foreground">{vehicle.licensePlate}</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-detail">
-          <X className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsEditOpen(true)} 
+            data-testid="button-edit-vehicle"
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsDeleteOpen(true)}
+            className="text-destructive hover:text-destructive"
+            data-testid="button-delete-vehicle"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-detail">
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="details" className="flex-1 flex flex-col">
@@ -294,6 +407,131 @@ export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, 
           </ScrollArea>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog de Edição de Veículo */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Veículo</DialogTitle>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Nome *</Label>
+                <Input
+                  id="edit-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Ex: Caminhão 01"
+                  data-testid="input-edit-vehicle-name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-licensePlate">Placa *</Label>
+                <Input
+                  id="edit-licensePlate"
+                  value={formData.licensePlate}
+                  onChange={(e) => setFormData({ ...formData, licensePlate: e.target.value })}
+                  placeholder="Ex: ABC-1234"
+                  data-testid="input-edit-vehicle-plate"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-model">Modelo</Label>
+                <Input
+                  id="edit-model"
+                  value={formData.model}
+                  onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                  placeholder="Ex: Mercedes Actros"
+                  data-testid="input-edit-vehicle-model"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-speedLimit">Limite de Velocidade (km/h)</Label>
+                <Input
+                  id="edit-speedLimit"
+                  type="number"
+                  value={formData.speedLimit}
+                  onChange={(e) => setFormData({ ...formData, speedLimit: parseInt(e.target.value) || 80 })}
+                  min={20}
+                  max={180}
+                  data-testid="input-edit-vehicle-speed-limit"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-latitude">Latitude</Label>
+                <Input
+                  id="edit-latitude"
+                  type="number"
+                  step="0.0001"
+                  value={formData.latitude}
+                  onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) || -23.5505 })}
+                  data-testid="input-edit-vehicle-latitude"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-longitude">Longitude</Label>
+                <Input
+                  id="edit-longitude"
+                  type="number"
+                  step="0.0001"
+                  value={formData.longitude}
+                  onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) || -46.6333 })}
+                  data-testid="input-edit-vehicle-longitude"
+                />
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEditSubmit} disabled={updateMutation.isPending} data-testid="button-save-edit-vehicle">
+              {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog de Exclusão */}
+      <AlertDialog open={isDeleteOpen} onOpenChange={(open) => {
+        // Só permite fechar manualmente se não estiver excluindo
+        if (!deleteMutation.isPending) {
+          setIsDeleteOpen(open);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Veículo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o veículo <strong>{vehicle.name}</strong> ({vehicle.licensePlate})?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-vehicle"
+            >
+              {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

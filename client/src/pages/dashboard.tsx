@@ -40,6 +40,11 @@ export default function Dashboard() {
         if (followVehicle?.id === selectedVehicle.id) {
           setFollowVehicle(updatedVehicle);
         }
+      } else {
+        // Veículo foi excluído, limpar seleção
+        setSelectedVehicle(undefined);
+        setFollowVehicle(undefined);
+        setRecentTrail([]);
       }
     }
   }, [vehicles, selectedVehicle?.id, followVehicle?.id]);

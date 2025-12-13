@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertVehicleSchema, insertGeofenceSchema, insertAlertSchema } from "@shared/schema";
+import { insertVehicleSchema, insertGeofenceSchema, insertAlertSchema, trackingDataSchema, type LocationPoint } from "@shared/schema";
 
 const clients = new Set<WebSocket>();
 
@@ -128,10 +128,26 @@ export async function registerRoutes(
   });
 
   app.post("/api/geofences", async (req, res) => {
+    console.error("[DEBUG] POST /api/geofences endpoint HIT - Body:", JSON.stringify(req.body));
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:130',message:'[H-D] POST /api/geofences called',data:{body:req.body,hasName:!!req.body?.name,hasType:!!req.body?.type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     try {
+      console.error("[DEBUG] Calling storage.createGeofence");
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:132',message:'[H-B] Before storage.createGeofence',data:{payload:req.body},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       const geofence = await storage.createGeofence(req.body);
+      console.error("[DEBUG] Geofence created successfully:", geofence.id);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:133',message:'[H-B] After storage.createGeofence SUCCESS',data:{geofenceId:geofence.id,name:geofence.name},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       res.status(201).json(geofence);
     } catch (error) {
+      console.error("[DEBUG] Error creating geofence:", error);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:135',message:'[H-C] createGeofence FAILED',data:{error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       res.status(500).json({ error: "Failed to create geofence" });
     }
   });
@@ -221,6 +237,9 @@ export async function registerRoutes(
   });
 
   app.get("/api/trips", async (req, res) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:223',message:'[H-D] getTrips called',data:{query:req.query},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     try {
       const { vehicleId, startDate, endDate } = req.query;
       
@@ -232,6 +251,9 @@ export async function registerRoutes(
       const end = endDate ? String(endDate) : new Date().toISOString();
       
       const trips = await storage.getTrips(vehicleId, start, end);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:236',message:'[H-D] getTrips result',data:{vehicleId,tripsCount:trips.length,hasPoints:trips[0]?.points?.length||0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       res.json(trips);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch trips" });
@@ -263,6 +285,96 @@ export async function registerRoutes(
       res.json(stats);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch speed stats" });
+    }
+  });
+
+  // ============================================
+  // TRACKING ENDPOINT (para rastreadores GPS)
+  // ============================================
+
+  app.post("/api/tracking", async (req, res) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:273',message:'[H-A] Tracking endpoint called',data:{body:req.body},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    try {
+      // Validar API Key
+      const apiKey = req.headers["x-api-key"];
+      const expectedApiKey = process.env.TRACKING_API_KEY;
+
+      if (!expectedApiKey) {
+        console.error("TRACKING_API_KEY não configurada no ambiente");
+        return res.status(500).json({ error: "API Key não configurada no servidor" });
+      }
+
+      if (!apiKey || apiKey !== expectedApiKey) {
+        return res.status(401).json({ error: "API Key inválida ou não fornecida" });
+      }
+
+      // Validar payload
+      const parsed = trackingDataSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          error: "Dados inválidos", 
+          details: parsed.error.errors 
+        });
+      }
+
+      const { licensePlate, latitude, longitude, speed } = parsed.data;
+
+      // Buscar veículo pela placa
+      let vehicle = await storage.getVehicleByPlate(licensePlate);
+
+      if (vehicle) {
+        // Atualizar veículo existente
+        const status = speed > 0 ? "moving" : "stopped";
+        vehicle = await storage.updateVehicle(vehicle.id, {
+          latitude,
+          longitude,
+          currentSpeed: speed,
+          status,
+          ignition: speed > 0 ? "on" : vehicle.ignition,
+          lastUpdate: new Date().toISOString(),
+        });
+      } else {
+        // Criar novo veículo
+        vehicle = await storage.createVehicle({
+          name: `Veículo ${licensePlate}`,
+          licensePlate,
+          latitude,
+          longitude,
+          currentSpeed: speed,
+          status: speed > 0 ? "moving" : "stopped",
+          ignition: speed > 0 ? "on" : "off",
+          speedLimit: 80,
+          heading: 0,
+          accuracy: 5,
+          lastUpdate: new Date().toISOString(),
+        });
+      }
+
+      // Salvar ponto no histórico de localizações
+      if (vehicle) {
+        const locationPoint: LocationPoint = {
+          latitude,
+          longitude,
+          speed,
+          heading: vehicle.heading,
+          timestamp: new Date().toISOString(),
+          accuracy: 5,
+          radius: speed === 0 ? 1000 : undefined, // 1KM se parado
+        };
+
+        await storage.addLocationPoint(vehicle.id, locationPoint);
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Posição atualizada com sucesso",
+        vehicle,
+      });
+    } catch (error) {
+      console.error("Erro no endpoint de tracking:", error);
+      res.status(500).json({ error: "Falha ao processar dados de rastreamento" });
     }
   });
 

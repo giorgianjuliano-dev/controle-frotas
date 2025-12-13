@@ -37,6 +37,7 @@ export const locationPointSchema = z.object({
   heading: z.number(),
   timestamp: z.string(),
   accuracy: z.number().optional(),
+  radius: z.number().optional(), // Raio em metros para exibir zona de parada
 });
 
 export type LocationPoint = z.infer<typeof locationPointSchema>;
@@ -72,6 +73,9 @@ export const tripSchema = z.object({
 });
 
 export type Trip = z.infer<typeof tripSchema>;
+
+export const insertTripSchema = tripSchema.omit({ id: true });
+export type InsertTrip = z.infer<typeof insertTripSchema>;
 
 export const geofenceRuleSchema = z.object({
   type: z.enum(["entry", "exit", "dwell", "time_violation"]),
@@ -178,6 +182,16 @@ export const insertUserSchema = z.object({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = { id: string; username: string; password: string };
+
+// Schema para dados de rastreamento (tracking)
+export const trackingDataSchema = z.object({
+  licensePlate: z.string().min(1, "Placa é obrigatória"),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  speed: z.number().min(0),
+});
+
+export type TrackingData = z.infer<typeof trackingDataSchema>;
 
 // ============================================
 // Drizzle ORM Table Definitions for Supabase

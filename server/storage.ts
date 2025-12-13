@@ -1,10 +1,14 @@
 import { randomUUID } from "crypto";
+import * as fs from "fs";
 import type { 
   Vehicle, InsertVehicle,
   Geofence, InsertGeofence,
   Alert, InsertAlert,
-  Trip, SpeedViolation, VehicleStats
+  Trip, SpeedViolation, VehicleStats,
+  LocationPoint
 } from "@shared/schema";
+
+const debugLogPath = 'c:\\Users\\mathe\\OneDrive\\Desktop\\CLONE ADELITON\\controle-frotas\\.cursor\\debug.log';
 
 type VehicleUpdateCallback = (vehicles: Vehicle[]) => void;
 
@@ -14,6 +18,7 @@ export interface IStorage {
   
   getVehicles(): Promise<Vehicle[]>;
   getVehicle(id: string): Promise<Vehicle | undefined>;
+  getVehicleByPlate(licensePlate: string): Promise<Vehicle | undefined>;
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle | undefined>;
   deleteVehicle(id: string): Promise<boolean>;
@@ -32,229 +37,20 @@ export interface IStorage {
   clearReadAlerts(): Promise<void>;
   
   getTrips(vehicleId: string, startDate: string, endDate: string): Promise<Trip[]>;
+  addLocationPoint(vehicleId: string, point: LocationPoint): Promise<void>;
   
   getSpeedViolations(startDate: string, endDate: string): Promise<SpeedViolation[]>;
   getSpeedStats(startDate: string, endDate: string): Promise<VehicleStats>;
 }
 
-const sampleVehicles: Vehicle[] = [
-  {
-    id: "v1",
-    name: "Caminhão 01",
-    licensePlate: "ABC-1234",
-    model: "Mercedes Actros",
-    status: "moving",
-    ignition: "on",
-    currentSpeed: 72,
-    speedLimit: 80,
-    heading: 45,
-    latitude: -23.5489,
-    longitude: -46.6388,
-    accuracy: 5,
-    lastUpdate: new Date().toISOString(),
-    batteryLevel: 85,
-  },
-  {
-    id: "v2",
-    name: "Van 02",
-    licensePlate: "DEF-5678",
-    model: "Fiat Ducato",
-    status: "moving",
-    ignition: "on",
-    currentSpeed: 95,
-    speedLimit: 60,
-    heading: 180,
-    latitude: -23.5605,
-    longitude: -46.6533,
-    accuracy: 3,
-    lastUpdate: new Date().toISOString(),
-    batteryLevel: 92,
-  },
-  {
-    id: "v3",
-    name: "Caminhão 03",
-    licensePlate: "GHI-9012",
-    model: "Volvo FH",
-    status: "stopped",
-    ignition: "off",
-    currentSpeed: 0,
-    speedLimit: 80,
-    heading: 0,
-    latitude: -23.5305,
-    longitude: -46.6233,
-    accuracy: 4,
-    lastUpdate: new Date(Date.now() - 300000).toISOString(),
-    batteryLevel: 78,
-  },
-  {
-    id: "v4",
-    name: "Van 04",
-    licensePlate: "JKL-3456",
-    model: "Renault Master",
-    status: "moving",
-    ignition: "on",
-    currentSpeed: 55,
-    speedLimit: 60,
-    heading: 270,
-    latitude: -23.5705,
-    longitude: -46.6433,
-    accuracy: 6,
-    lastUpdate: new Date().toISOString(),
-    batteryLevel: 67,
-  },
-  {
-    id: "v5",
-    name: "Caminhão 05",
-    licensePlate: "MNO-7890",
-    model: "Scania R450",
-    status: "idle",
-    ignition: "on",
-    currentSpeed: 0,
-    speedLimit: 80,
-    heading: 90,
-    latitude: -23.5405,
-    longitude: -46.6133,
-    accuracy: 4,
-    lastUpdate: new Date(Date.now() - 120000).toISOString(),
-    batteryLevel: 91,
-  },
-  {
-    id: "v6",
-    name: "Van 06",
-    licensePlate: "PQR-1234",
-    model: "VW Delivery",
-    status: "offline",
-    ignition: "off",
-    currentSpeed: 0,
-    speedLimit: 60,
-    heading: 0,
-    latitude: -23.5205,
-    longitude: -46.6733,
-    accuracy: 10,
-    lastUpdate: new Date(Date.now() - 3600000).toISOString(),
-    batteryLevel: 45,
-  },
-];
+// Array vazio - veículos serão criados via API ou tracking
+const sampleVehicles: Vehicle[] = [];
 
-const sampleGeofences: Geofence[] = [
-  {
-    id: "g1",
-    name: "Depósito Central",
-    description: "Área principal de carga e descarga",
-    type: "circle",
-    active: true,
-    center: { latitude: -23.5505, longitude: -46.6333 },
-    radius: 500,
-    rules: [
-      { type: "entry", enabled: true, toleranceSeconds: 30 },
-      { type: "exit", enabled: true, toleranceSeconds: 30 },
-      { type: "dwell", enabled: true, dwellTimeMinutes: 60, toleranceSeconds: 30 },
-    ],
-    vehicleIds: ["v1", "v2", "v3", "v4", "v5"],
-    lastTriggered: new Date(Date.now() - 3600000).toISOString(),
-    color: "#22c55e",
-  },
-  {
-    id: "g2",
-    name: "Zona de Entrega Norte",
-    description: "Região de entregas no setor norte",
-    type: "polygon",
-    active: true,
-    points: [
-      { latitude: -23.5200, longitude: -46.6400 },
-      { latitude: -23.5200, longitude: -46.6200 },
-      { latitude: -23.5350, longitude: -46.6200 },
-      { latitude: -23.5350, longitude: -46.6400 },
-    ],
-    rules: [
-      { type: "entry", enabled: true, toleranceSeconds: 60 },
-      { type: "exit", enabled: true, toleranceSeconds: 60 },
-    ],
-    vehicleIds: ["v1", "v3", "v5"],
-    color: "#3b82f6",
-  },
-  {
-    id: "g3",
-    name: "Área Restrita",
-    description: "Zona de acesso proibido",
-    type: "circle",
-    active: true,
-    center: { latitude: -23.5800, longitude: -46.6600 },
-    radius: 300,
-    rules: [
-      { type: "entry", enabled: true, toleranceSeconds: 10 },
-    ],
-    vehicleIds: ["v1", "v2", "v3", "v4", "v5", "v6"],
-    color: "#ef4444",
-  },
-];
+// Array vazio - geofences serão criadas via UI
+const sampleGeofences: Geofence[] = [];
 
-const sampleAlerts: Alert[] = [
-  {
-    id: "a1",
-    type: "speed",
-    priority: "critical",
-    vehicleId: "v2",
-    vehicleName: "Van 02",
-    message: "Velocidade acima do limite: 95 km/h em zona de 60 km/h",
-    timestamp: new Date().toISOString(),
-    read: false,
-    latitude: -23.5605,
-    longitude: -46.6533,
-    speed: 95,
-    speedLimit: 60,
-  },
-  {
-    id: "a2",
-    type: "geofence_entry",
-    priority: "info",
-    vehicleId: "v1",
-    vehicleName: "Caminhão 01",
-    message: "Entrada na área 'Depósito Central'",
-    timestamp: new Date(Date.now() - 1800000).toISOString(),
-    read: false,
-    latitude: -23.5505,
-    longitude: -46.6333,
-    geofenceName: "Depósito Central",
-  },
-  {
-    id: "a3",
-    type: "speed",
-    priority: "warning",
-    vehicleId: "v4",
-    vehicleName: "Van 04",
-    message: "Velocidade próxima ao limite: 55 km/h em zona de 60 km/h",
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    read: true,
-    latitude: -23.5705,
-    longitude: -46.6433,
-    speed: 55,
-    speedLimit: 60,
-  },
-  {
-    id: "a4",
-    type: "geofence_exit",
-    priority: "warning",
-    vehicleId: "v3",
-    vehicleName: "Caminhão 03",
-    message: "Saída da área 'Zona de Entrega Norte'",
-    timestamp: new Date(Date.now() - 7200000).toISOString(),
-    read: true,
-    latitude: -23.5350,
-    longitude: -46.6400,
-    geofenceName: "Zona de Entrega Norte",
-  },
-  {
-    id: "a5",
-    type: "system",
-    priority: "info",
-    vehicleId: "v6",
-    vehicleName: "Van 06",
-    message: "Veículo offline há mais de 1 hora",
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    read: false,
-  },
-];
+// Array vazio - alertas serão gerados pelo sistema
+const sampleAlerts: Alert[] = [];
 
 function generateSampleTrip(vehicleId: string, startDate: string, endDate: string): Trip {
   const vehicle = sampleVehicles.find(v => v.id === vehicleId);
@@ -507,6 +303,15 @@ export class MemStorage implements IStorage {
     return this.vehicles.get(id);
   }
 
+  async getVehicleByPlate(licensePlate: string): Promise<Vehicle | undefined> {
+    for (const vehicle of this.vehicles.values()) {
+      if (vehicle.licensePlate === licensePlate) {
+        return vehicle;
+      }
+    }
+    return undefined;
+  }
+
   async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
     const id = randomUUID();
     const newVehicle: Vehicle = { ...vehicle, id };
@@ -599,7 +404,18 @@ export class MemStorage implements IStorage {
   }
 
   async getTrips(vehicleId: string, startDate: string, endDate: string): Promise<Trip[]> {
+    // #region agent log
+    const fs = require('fs');
+    const logEntry = JSON.stringify({location:'storage.ts:612',message:'[H-C] MemStorage.getTrips called - returning SIMULATED data',data:{vehicleId,startDate,endDate},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'}) + '\n';
+    fs.appendFileSync('c:\\Users\\mathe\\OneDrive\\Desktop\\CLONE ADELITON\\controle-frotas\\.cursor\\debug.log', logEntry);
+    // #endregion
     return [generateSampleTrip(vehicleId, startDate, endDate)];
+  }
+
+  async addLocationPoint(vehicleId: string, point: LocationPoint): Promise<void> {
+    // MemStorage: armazena pontos em memória para desenvolvimento/testes
+    // Em produção, use SupabaseStorage para persistência real
+    console.log(`[MemStorage] Ponto de localização recebido para veículo ${vehicleId}:`, point);
   }
 
   async getSpeedViolations(startDate: string, endDate: string): Promise<SpeedViolation[]> {
@@ -617,6 +433,10 @@ import { SupabaseStorage } from "./supabase-storage";
 // Função para criar o storage apropriado baseado na configuração
 function createStorage(): IStorage {
   const storageType = process.env.STORAGE_TYPE || 'memory';
+  
+  // #region agent log
+  try { fs.appendFileSync(debugLogPath, JSON.stringify({location:'storage.ts:635',message:'[H-C] Storage type being used',data:{storageType,supabaseConfigured:isSupabaseConfigured()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})+'\n'); } catch(e){}
+  // #endregion
   
   if (storageType === 'supabase') {
     if (!isSupabaseConfigured()) {

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearch } from "wouter";
-import { MapContainer, TileLayer, Polyline, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, Circle } from "react-leaflet";
 import L from "leaflet";
 import { 
   Calendar as CalendarIcon, Clock, MapPin, Gauge, 
@@ -59,9 +59,15 @@ export default function History() {
   });
 
   const { data: trips = [], isLoading: isLoadingTrips } = useQuery<Trip[]>({
-    queryKey: ["/api/trips", selectedVehicleId, dateRange.from.toISOString(), dateRange.to.toISOString()],
+    queryKey: [`/api/trips?vehicleId=${selectedVehicleId}&startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}`],
     enabled: !!selectedVehicleId,
   });
+
+  // #region agent log
+  if (typeof window !== 'undefined' && selectedVehicleId) {
+    fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:65',message:'[H-D] Frontend trips query',data:{selectedVehicleId,dateFrom:dateRange.from.toISOString(),dateTo:dateRange.to.toISOString(),tripsCount:trips.length,hasPoints:trips[0]?.points?.length||0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+  }
+  // #endregion
 
   const selectedTrip = trips[0];
 
@@ -275,6 +281,24 @@ export default function History() {
                       </div>
                     </Popup>
                   </Marker>
+                ))}
+              
+              {/* Círculos de raio para pontos de parada */}
+              {selectedTrip.points
+                .filter(point => point.radius)
+                .map((point, idx) => (
+                  <Circle
+                    key={`circle-${idx}`}
+                    center={[point.latitude, point.longitude]}
+                    radius={point.radius}
+                    pathOptions={{
+                      color: '#f59e0b',
+                      fillColor: '#fbbf24',
+                      fillOpacity: 0.15,
+                      weight: 2,
+                      opacity: 0.6,
+                    }}
+                  />
                 ))}
             </MapContainer>
           )}

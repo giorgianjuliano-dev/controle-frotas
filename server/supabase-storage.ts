@@ -171,6 +171,42 @@ export class SupabaseStorage implements IStorage {
     };
   }
 
+  async getVehicleByPlate(licensePlate: string): Promise<Vehicle | undefined> {
+    const { data, error } = await this.supabase
+      .from('vehicles')
+      .select('*')
+      .eq('license_plate', licensePlate)
+      .order('last_update', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error('Error fetching vehicle by plate:', error);
+      throw new Error(`Falha ao buscar veículo pela placa: ${error.message}`);
+    }
+
+    const rows = data as VehicleRow[] | null;
+    if (!rows || rows.length === 0) return undefined;
+    
+    const row = rows[0];
+
+    return {
+      id: row.id,
+      name: row.name,
+      licensePlate: row.license_plate,
+      model: row.model ?? undefined,
+      status: row.status as Vehicle['status'],
+      ignition: row.ignition as Vehicle['ignition'],
+      currentSpeed: row.current_speed,
+      speedLimit: row.speed_limit,
+      heading: row.heading,
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      accuracy: Number(row.accuracy),
+      lastUpdate: row.last_update,
+      batteryLevel: row.battery_level ?? undefined,
+    };
+  }
+
   async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
     const { data, error } = await this.supabase
       .from('vehicles')
@@ -357,6 +393,9 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createGeofence(geofence: InsertGeofence): Promise<Geofence> {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase-storage.ts:395',message:'[H-E] createGeofence entry',data:{name:geofence.name,type:geofence.type,hasCenter:!!geofence.center,hasPoints:!!geofence.points,color:geofence.color},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     const { data, error } = await this.supabase
       .from('geofences')
       .insert({
@@ -374,6 +413,10 @@ export class SupabaseStorage implements IStorage {
       })
       .select()
       .single();
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase-storage.ts:414',message:'[H-A] Supabase insert result',data:{hasData:!!data,errorCode:error?.code,errorMessage:error?.message,errorDetails:error?.details},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     if (error) {
       console.error('Error creating geofence:', error);
@@ -653,6 +696,9 @@ export class SupabaseStorage implements IStorage {
   // ============================================
 
   async getTrips(vehicleId: string, startDate: string, endDate: string): Promise<Trip[]> {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase-storage.ts:691',message:'[H-D] SupabaseStorage.getTrips called',data:{vehicleId,startDate,endDate},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     const { data, error } = await this.supabase
       .from('trips')
       .select('*')
@@ -660,6 +706,10 @@ export class SupabaseStorage implements IStorage {
       .gte('start_time', startDate)
       .lte('end_time', endDate)
       .order('start_time', { ascending: false });
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/f9cb76f8-6507-4361-b279-2be2b44cfa69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase-storage.ts:703',message:'[H-D] SupabaseStorage.getTrips result',data:{rowsCount:data?.length||0,error:error?.message||null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
 
     if (error) {
       console.error('Error fetching trips:', error);
@@ -681,6 +731,108 @@ export class SupabaseStorage implements IStorage {
       points: (row.points as LocationPoint[]) || [],
       events: (row.events as RouteEvent[]) || [],
     }));
+  }
+
+  async addLocationPoint(vehicleId: string, point: LocationPoint): Promise<void> {
+    // 1. Buscar trip ativa do veículo (a mais recente)
+    const { data: existingTrips, error: fetchError } = await this.supabase
+      .from('trips')
+      .select('*')
+      .eq('vehicle_id', vehicleId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (fetchError) {
+      console.error('Erro ao buscar trip:', fetchError);
+      throw new Error(`Falha ao buscar trip: ${fetchError.message}`);
+    }
+
+    const existingTrip = existingTrips && existingTrips.length > 0 ? existingTrips[0] : null;
+
+    if (existingTrip) {
+      // 2a. Adicionar ponto à trip existente
+      const currentPoints = (existingTrip.points as LocationPoint[]) || [];
+      const points = [...currentPoints, point];
+      const maxSpeed = Math.max(Number(existingTrip.max_speed), point.speed);
+      
+      // Calcular distância incremental usando fórmula de Haversine
+      let additionalDistance = 0;
+      if (currentPoints.length > 0) {
+        const lastPoint = currentPoints[currentPoints.length - 1];
+        additionalDistance = this.calculateDistance(
+          lastPoint.latitude, lastPoint.longitude,
+          point.latitude, point.longitude
+        );
+      }
+      
+      const totalDistance = Number(existingTrip.total_distance) + additionalDistance;
+      
+      // Calcular tempo de viagem
+      const startTime = new Date(existingTrip.start_time).getTime();
+      const endTime = new Date(point.timestamp).getTime();
+      const travelTimeMinutes = (endTime - startTime) / (1000 * 60);
+      
+      // Calcular velocidade média
+      const averageSpeed = travelTimeMinutes > 0 
+        ? (totalDistance / (travelTimeMinutes / 60)) 
+        : point.speed;
+
+      const { error: updateError } = await this.supabase
+        .from('trips')
+        .update({
+          points,
+          end_time: point.timestamp,
+          max_speed: maxSpeed,
+          total_distance: totalDistance,
+          travel_time: travelTimeMinutes,
+          average_speed: averageSpeed,
+        })
+        .eq('id', existingTrip.id);
+
+      if (updateError) {
+        console.error('Erro ao atualizar trip:', updateError);
+        throw new Error(`Falha ao atualizar trip: ${updateError.message}`);
+      }
+    } else {
+      // 2b. Criar nova trip
+      const { error: insertError } = await this.supabase
+        .from('trips')
+        .insert({
+          vehicle_id: vehicleId,
+          start_time: point.timestamp,
+          end_time: point.timestamp,
+          total_distance: 0,
+          travel_time: 0,
+          stopped_time: 0,
+          average_speed: point.speed,
+          max_speed: point.speed,
+          stops_count: 0,
+          points: [point],
+          events: [],
+        });
+
+      if (insertError) {
+        console.error('Erro ao criar trip:', insertError);
+        throw new Error(`Falha ao criar trip: ${insertError.message}`);
+      }
+    }
+  }
+
+  // Fórmula de Haversine para calcular distância entre dois pontos em km
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Raio da Terra em km
+    const dLat = this.toRad(lat2 - lat1);
+    const dLon = this.toRad(lon2 - lon1);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private toRad(deg: number): number {
+    return deg * (Math.PI / 180);
   }
 
   // ============================================

@@ -402,3 +402,9 @@ Execute os comandos SQL da seção 2 para criar as tabelas.
 3. **Backup**: Configurar backups automáticos no Supabase Dashboard
 4. **Monitoramento**: Usar o Supabase Dashboard para monitorar performance
 
+
+
+
+
+
+

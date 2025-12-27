@@ -66,7 +66,7 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+const setupPromise = (async () => {
   // #region agent log
   try { fs.appendFileSync(debugLogPath, JSON.stringify({location:'index.ts:63',message:'[H-A] Starting async initialization',data:{supabaseUrl:!!process.env.SUPABASE_URL,supabaseKey:!!process.env.SUPABASE_SERVICE_ROLE_KEY,storageType:process.env.STORAGE_TYPE},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B'})+'\n'); } catch(e){}
   // #endregion
@@ -111,25 +111,37 @@ app.use((req, res, next) => {
     }
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-  
-  httpServer.on('error', (err: any) => {
-    // #region agent log
-    try { fs.appendFileSync(debugLogPath, JSON.stringify({location:'index.ts:114',message:'[H-D] HTTP Server error',data:{code:err?.code,message:err?.message,port},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})+'\n'); } catch(e){}
-    // #endregion
-    if (err.code === 'EADDRINUSE') {
-      console.error(`❌ Porta ${port} já está em uso!`);
-    }
-  });
-  
-  httpServer.listen(port, () => {
-    log(`serving on port ${port}`);
-    // #region agent log
-    try { fs.appendFileSync(debugLogPath, JSON.stringify({location:'index.ts:124',message:'[H-A] Server listening successfully',data:{port},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D'})+'\n'); } catch(e){}
-    // #endregion
-  });
+  return app;
 })();
+
+if (process.env.VERCEL !== "1") {
+  setupPromise.then(() => {
+    // ALWAYS serve the app on the port specified in the environment variable PORT
+    // Other ports are firewalled. Default to 5000 if not specified.
+    // this serves both the API and the client.
+    // It is the only port that is not firewalled.
+    const port = parseInt(process.env.PORT || "5000", 10);
+    
+    httpServer.on('error', (err: any) => {
+      // #region agent log
+      try { fs.appendFileSync(debugLogPath, JSON.stringify({location:'index.ts:114',message:'[H-D] HTTP Server error',data:{code:err?.code,message:err?.message,port},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})+'\n'); } catch(e){}
+      // #endregion
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Porta ${port} já está em uso!`);
+      }
+    });
+    
+    httpServer.listen(port, () => {
+      log(`serving on port ${port}`);
+      // #region agent log
+      try { fs.appendFileSync(debugLogPath, JSON.stringify({location:'index.ts:124',message:'[H-A] Server listening successfully',data:{port},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D'})+'\n'); } catch(e){}
+      // #endregion
+    });
+  });
+}
+
+// Export for Vercel
+export default async (req: any, res: any) => {
+  await setupPromise;
+  app(req, res);
+};

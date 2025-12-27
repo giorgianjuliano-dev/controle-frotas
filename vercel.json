@@ -4,6 +4,11 @@
   "outputDirectory": "dist/public",
   "installCommand": "npm install --include=dev",
   "framework": null,
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "dist/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!assets|favicon|api).*)",

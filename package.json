@@ -9,7 +9,7 @@
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "build:vercel": "npx vite build"
+    "build:vercel": "tsx script/build.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

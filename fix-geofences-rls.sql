@@ -10,3 +10,4 @@ FOR ALL
 USING (true)
 WITH CHECK (true);
 
+

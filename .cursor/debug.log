@@ -944,3 +944,43 @@
 {"location":"routes.ts:273","message":"[H-A] Tracking endpoint called","data":{"body":{"licensePlate":"FLA-1981","latitude":-3.106314,"longitude":-60.0217912,"speed":0}},"timestamp":1765660574144,"sessionId":"debug-session","hypothesisId":"A"}
 {"location":"routes.ts:273","message":"[H-A] Tracking endpoint called","data":{"body":{"licensePlate":"FLA-1981","latitude":-3.106314,"longitude":-60.0217912,"speed":0}},"timestamp":1765660584266,"sessionId":"debug-session","hypothesisId":"A"}
 {"location":"routes.ts:273","message":"[H-A] Tracking endpoint called","data":{"body":{"licensePlate":"FLA-1981","latitude":-3.106314,"longitude":-60.0217912,"speed":0}},"timestamp":1765660584269,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"storage.ts:635","message":"[H-C] Storage type being used","data":{"storageType":"supabase","supabaseConfigured":true},"timestamp":1766856459977,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"supabase.ts:12","message":"[H-B] Checking Supabase env vars","data":{"hasUrl":true,"hasKey":true,"urlPrefix":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766856459978,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"supabase.ts:35","message":"[H-C] Supabase client created successfully","data":{"url":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766856459983,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"index.ts:1","message":"[H-A] Server module loading","data":{"nodeEnv":"development"},"timestamp":1766856459991,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:63","message":"[H-A] Starting async initialization","data":{"supabaseUrl":true,"supabaseKey":true,"storageType":"supabase"},"timestamp":1766856459996,"sessionId":"debug-session","hypothesisId":"A,B"}
+{"location":"index.ts:70","message":"[H-A] Routes registered successfully","data":{},"timestamp":1766856459999,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:96","message":"[H-E] Vite setup completed","data":{},"timestamp":1766856460861,"sessionId":"debug-session","hypothesisId":"E"}
+{"location":"index.ts:124","message":"[H-A] Server listening successfully","data":{"port":5000},"timestamp":1766856460925,"sessionId":"debug-session","hypothesisId":"A,D"}
+{"location":"storage.ts:635","message":"[H-C] Storage type being used","data":{"storageType":"supabase","supabaseConfigured":true},"timestamp":1766856623230,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"supabase.ts:12","message":"[H-B] Checking Supabase env vars","data":{"hasUrl":true,"hasKey":true,"urlPrefix":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766856623232,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"supabase.ts:35","message":"[H-C] Supabase client created successfully","data":{"url":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766856623236,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"index.ts:1","message":"[H-A] Server module loading","data":{"nodeEnv":"development"},"timestamp":1766856623241,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:63","message":"[H-A] Starting async initialization","data":{"supabaseUrl":true,"supabaseKey":true,"storageType":"supabase"},"timestamp":1766856623245,"sessionId":"debug-session","hypothesisId":"A,B"}
+{"location":"index.ts:70","message":"[H-A] Routes registered successfully","data":{},"timestamp":1766856623247,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:96","message":"[H-E] Vite setup completed","data":{},"timestamp":1766856624069,"sessionId":"debug-session","hypothesisId":"E"}
+{"location":"index.ts:124","message":"[H-A] Server listening successfully","data":{"port":5000},"timestamp":1766856624146,"sessionId":"debug-session","hypothesisId":"A,D"}
+{"location":"storage.ts:635","message":"[H-C] Storage type being used","data":{"storageType":"supabase","supabaseConfigured":true},"timestamp":1766856773249,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"supabase.ts:12","message":"[H-B] Checking Supabase env vars","data":{"hasUrl":true,"hasKey":true,"urlPrefix":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766856773251,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"supabase.ts:35","message":"[H-C] Supabase client created successfully","data":{"url":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766856773255,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"index.ts:1","message":"[H-A] Server module loading","data":{"nodeEnv":"development"},"timestamp":1766856773260,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:63","message":"[H-A] Starting async initialization","data":{"supabaseUrl":true,"supabaseKey":true,"storageType":"supabase"},"timestamp":1766856773263,"sessionId":"debug-session","hypothesisId":"A,B"}
+{"location":"index.ts:70","message":"[H-A] Routes registered successfully","data":{},"timestamp":1766856773265,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:96","message":"[H-E] Vite setup completed","data":{},"timestamp":1766856774013,"sessionId":"debug-session","hypothesisId":"E"}
+{"location":"index.ts:124","message":"[H-A] Server listening successfully","data":{"port":5000},"timestamp":1766856774030,"sessionId":"debug-session","hypothesisId":"A,D"}
+{"location":"storage.ts:635","message":"[H-C] Storage type being used","data":{"storageType":"supabase","supabaseConfigured":true},"timestamp":1766856911411,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"supabase.ts:12","message":"[H-B] Checking Supabase env vars","data":{"hasUrl":true,"hasKey":true,"urlPrefix":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766856911414,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"supabase.ts:35","message":"[H-C] Supabase client created successfully","data":{"url":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766856911418,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"index.ts:1","message":"[H-A] Server module loading","data":{"nodeEnv":"development"},"timestamp":1766856911430,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:63","message":"[H-A] Starting async initialization","data":{"supabaseUrl":true,"supabaseKey":true,"storageType":"supabase"},"timestamp":1766856911434,"sessionId":"debug-session","hypothesisId":"A,B"}
+{"location":"index.ts:70","message":"[H-A] Routes registered successfully","data":{},"timestamp":1766856911437,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:96","message":"[H-E] Vite setup completed","data":{},"timestamp":1766856912268,"sessionId":"debug-session","hypothesisId":"E"}
+{"location":"index.ts:124","message":"[H-A] Server listening successfully","data":{"port":5000},"timestamp":1766856912317,"sessionId":"debug-session","hypothesisId":"A,D"}
+{"location":"storage.ts:635","message":"[H-C] Storage type being used","data":{"storageType":"supabase","supabaseConfigured":true},"timestamp":1766857111181,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"supabase.ts:12","message":"[H-B] Checking Supabase env vars","data":{"hasUrl":true,"hasKey":true,"urlPrefix":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766857111183,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"supabase.ts:35","message":"[H-C] Supabase client created successfully","data":{"url":"https://idefhmdjunmnmiunaovv.s"},"timestamp":1766857111188,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"index.ts:1","message":"[H-A] Server module loading","data":{"nodeEnv":"development"},"timestamp":1766857111194,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:63","message":"[H-A] Starting async initialization","data":{"supabaseUrl":true,"supabaseKey":true,"storageType":"supabase"},"timestamp":1766857111197,"sessionId":"debug-session","hypothesisId":"A,B"}
+{"location":"index.ts:70","message":"[H-A] Routes registered successfully","data":{},"timestamp":1766857111201,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"index.ts:96","message":"[H-E] Vite setup completed","data":{},"timestamp":1766857111911,"sessionId":"debug-session","hypothesisId":"E"}
+{"location":"index.ts:124","message":"[H-A] Server listening successfully","data":{"port":5000},"timestamp":1766857111929,"sessionId":"debug-session","hypothesisId":"A,D"}

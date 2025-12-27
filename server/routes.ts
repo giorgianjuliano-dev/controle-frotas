@@ -319,36 +319,53 @@ export async function registerRoutes(
         });
       }
 
-      const { licensePlate, latitude, longitude, speed } = parsed.data;
+      const { licensePlate, latitude, longitude, speed, heading, ignition, batteryLevel, timestamp } = parsed.data;
+      const updateTime = timestamp || new Date().toISOString();
 
       // Buscar veículo pela placa
       let vehicle = await storage.getVehicleByPlate(licensePlate);
 
       if (vehicle) {
         // Atualizar veículo existente
-        const status = speed > 0 ? "moving" : "stopped";
+        const currentIgnition = ignition || (speed > 0 ? "on" : vehicle.ignition);
+        let status = speed > 0 ? "moving" : "stopped";
+        
+        if (currentIgnition === "on" && speed === 0) {
+          status = "idle";
+        }
+
         vehicle = await storage.updateVehicle(vehicle.id, {
           latitude,
           longitude,
           currentSpeed: speed,
           status,
-          ignition: speed > 0 ? "on" : vehicle.ignition,
-          lastUpdate: new Date().toISOString(),
+          ignition: currentIgnition,
+          heading: heading ?? vehicle.heading,
+          batteryLevel: batteryLevel ?? vehicle.batteryLevel,
+          lastUpdate: updateTime,
         });
       } else {
         // Criar novo veículo
+        const currentIgnition = ignition || (speed > 0 ? "on" : "off");
+        let status = speed > 0 ? "moving" : "stopped";
+        
+        if (currentIgnition === "on" && speed === 0) {
+          status = "idle";
+        }
+
         vehicle = await storage.createVehicle({
           name: `Veículo ${licensePlate}`,
           licensePlate,
           latitude,
           longitude,
           currentSpeed: speed,
-          status: speed > 0 ? "moving" : "stopped",
-          ignition: speed > 0 ? "on" : "off",
+          status,
+          ignition: currentIgnition,
           speedLimit: 80,
-          heading: 0,
+          heading: heading || 0,
           accuracy: 5,
-          lastUpdate: new Date().toISOString(),
+          lastUpdate: updateTime,
+          batteryLevel: batteryLevel,
         });
       }
 
@@ -358,13 +375,33 @@ export async function registerRoutes(
           latitude,
           longitude,
           speed,
-          heading: vehicle.heading,
-          timestamp: new Date().toISOString(),
+          heading: heading ?? vehicle.heading,
+          timestamp: updateTime,
           accuracy: 5,
           radius: speed === 0 ? 1000 : undefined, // 1KM se parado
         };
 
         await storage.addLocationPoint(vehicle.id, locationPoint);
+
+        // Detectar e salvar infração de velocidade
+        if (speed > vehicle.speedLimit) {
+          try {
+            await storage.createSpeedViolation({
+              vehicleId: vehicle.id,
+              vehicleName: vehicle.name,
+              speed,
+              speedLimit: vehicle.speedLimit,
+              excessSpeed: speed - vehicle.speedLimit,
+              latitude,
+              longitude,
+              duration: 10, // duração estimada em segundos
+              timestamp: updateTime,
+            });
+            console.log(`[SPEED] Infração registrada: ${vehicle.name} a ${speed}km/h (limite: ${vehicle.speedLimit}km/h)`);
+          } catch (violationError) {
+            console.error("Erro ao registrar infração de velocidade:", violationError);
+          }
+        }
       }
 
       res.status(200).json({

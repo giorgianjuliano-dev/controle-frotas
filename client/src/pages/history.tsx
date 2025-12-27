@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearch } from "wouter";
-import { MapContainer, TileLayer, Polyline, Marker, Popup, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, Circle, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import { 
   Calendar as CalendarIcon, Clock, MapPin, Gauge, 
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,13 +44,23 @@ const stopIcon = L.divIcon({
   iconAnchor: [12, 12],
 });
 
+function HistoryMapController({ center }: { center: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, 16, { animate: true });
+    }
+  }, [center, map]);
+  return null;
+}
+
 export default function History() {
   const searchParams = new URLSearchParams(useSearch());
   const vehicleIdParam = searchParams.get("vehicleId");
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(vehicleIdParam || "");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: startOfDay(new Date()),
+    from: startOfDay(subDays(new Date(), 30)),
     to: endOfDay(new Date()),
   });
   const [selectedEvent, setSelectedEvent] = useState<RouteEvent | null>(null);
@@ -70,6 +81,10 @@ export default function History() {
   // #endregion
 
   const selectedTrip = trips[0];
+
+  useEffect(() => {
+    setSelectedEvent(null);
+  }, [selectedTrip]);
 
   const quickFilters = [
     { label: "Hoje", days: 0 },
@@ -230,6 +245,26 @@ export default function History() {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
+
+              <HistoryMapController center={selectedEvent ? [selectedEvent.latitude, selectedEvent.longitude] : null} />
+              
+              {selectedEvent && (
+                <Circle
+                  center={[selectedEvent.latitude, selectedEvent.longitude]}
+                  radius={150}
+                  pathOptions={{
+                    color: "#f59e0b",
+                    fillColor: "#fbbf24",
+                    fillOpacity: 0.15,
+                    weight: 2,
+                    dashArray: "6, 6"
+                  }}
+                >
+                  <Tooltip permanent direction="top" offset={[0, -20]}>
+                    <div className="font-semibold text-xs">Raio: 150m</div>
+                  </Tooltip>
+                </Circle>
+              )}
               
               {routePositions.length > 1 && (
                 <Polyline

@@ -2,7 +2,7 @@ import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import type { Vehicle } from "@shared/schema";
 
-const createVehicleIcon = (heading: number, status: Vehicle["status"]) => {
+const createVehicleIcon = (heading: number, status: Vehicle["status"], isRecent: boolean) => {
   const color = status === "moving" ? "#22c55e" : status === "stopped" ? "#f59e0b" : status === "idle" ? "#3b82f6" : "#9ca3af";
   
   const svgIcon = `
@@ -16,7 +16,7 @@ const createVehicleIcon = (heading: number, status: Vehicle["status"]) => {
 
   return L.divIcon({
     html: svgIcon,
-    className: "vehicle-marker",
+    className: `vehicle-marker ${isRecent ? "pulse-marker" : ""}`,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
     popupAnchor: [0, -20],
@@ -30,7 +30,16 @@ interface VehicleMarkerProps {
 }
 
 export function VehicleMarker({ vehicle, isSelected, onClick }: VehicleMarkerProps) {
-  const icon = createVehicleIcon(vehicle.heading, vehicle.status);
+  const now = new Date();
+  const lastUpdate = new Date(vehicle.lastUpdate);
+  const diffSeconds = (now.getTime() - lastUpdate.getTime()) / 1000;
+  
+  // Considera offline se não atualiza há mais de 10 minutos
+  const isOffline = diffSeconds > 600;
+  const isRecent = diffSeconds < 60 && !isOffline;
+
+  const effectiveStatus = isOffline ? "offline" : vehicle.status;
+  const icon = createVehicleIcon(vehicle.heading, effectiveStatus, isRecent);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);

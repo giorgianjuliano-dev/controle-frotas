@@ -5,7 +5,7 @@ import type {
   Geofence, InsertGeofence,
   Alert, InsertAlert,
   Trip, SpeedViolation, VehicleStats,
-  LocationPoint
+  LocationPoint, InsertSpeedViolation
 } from "@shared/schema";
 
 const debugLogPath = 'c:\\Users\\mathe\\OneDrive\\Desktop\\CLONE ADELITON\\controle-frotas\\.cursor\\debug.log';
@@ -41,6 +41,7 @@ export interface IStorage {
   
   getSpeedViolations(startDate: string, endDate: string): Promise<SpeedViolation[]>;
   getSpeedStats(startDate: string, endDate: string): Promise<VehicleStats>;
+  createSpeedViolation(violation: InsertSpeedViolation): Promise<SpeedViolation>;
 }
 
 // Array vazio - veículos serão criados via API ou tracking
@@ -424,6 +425,15 @@ export class MemStorage implements IStorage {
 
   async getSpeedStats(startDate: string, endDate: string): Promise<VehicleStats> {
     return generateSpeedStats(startDate, endDate);
+  }
+
+  async createSpeedViolation(violation: InsertSpeedViolation): Promise<SpeedViolation> {
+    // Implementação in-memory para desenvolvimento/testes
+    const newViolation: SpeedViolation = {
+      id: randomUUID(),
+      ...violation,
+    };
+    return newViolation;
   }
 }
 

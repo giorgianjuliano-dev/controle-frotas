@@ -4,7 +4,7 @@ import type {
   Geofence, InsertGeofence, GeofenceRule,
   Alert, InsertAlert,
   Trip, SpeedViolation, VehicleStats,
-  LocationPoint, RouteEvent
+  LocationPoint, RouteEvent, InsertSpeedViolation
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -917,6 +917,42 @@ export class SupabaseStorage implements IStorage {
         .map(([date, count]) => ({ date, count }))
         .sort((a, b) => a.date.localeCompare(b.date)),
       topViolators,
+    };
+  }
+
+  async createSpeedViolation(violation: InsertSpeedViolation): Promise<SpeedViolation> {
+    const { data, error } = await this.supabase
+      .from('speed_violations')
+      .insert({
+        vehicle_id: violation.vehicleId,
+        vehicle_name: violation.vehicleName,
+        speed: violation.speed,
+        speed_limit: violation.speedLimit,
+        excess_speed: violation.excessSpeed,
+        latitude: violation.latitude,
+        longitude: violation.longitude,
+        duration: violation.duration,
+        timestamp: violation.timestamp,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating speed violation:', error);
+      throw new Error(`Falha ao criar violação de velocidade: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      vehicleId: data.vehicle_id,
+      vehicleName: data.vehicle_name,
+      speed: data.speed,
+      speedLimit: data.speed_limit,
+      excessSpeed: data.excess_speed,
+      latitude: Number(data.latitude),
+      longitude: Number(data.longitude),
+      duration: data.duration,
+      timestamp: data.timestamp,
     };
   }
 }

@@ -150,6 +150,9 @@ export const speedViolationSchema = z.object({
 
 export type SpeedViolation = z.infer<typeof speedViolationSchema>;
 
+export const insertSpeedViolationSchema = speedViolationSchema.omit({ id: true });
+export type InsertSpeedViolation = z.infer<typeof insertSpeedViolationSchema>;
+
 export const vehicleStatsSchema = z.object({
   totalViolations: z.number(),
   vehiclesWithViolations: z.number(),
@@ -189,6 +192,10 @@ export const trackingDataSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   speed: z.number().min(0),
+  heading: z.number().optional(),
+  ignition: z.enum(["on", "off"]).optional(),
+  batteryLevel: z.number().optional(),
+  timestamp: z.string().optional(),
 });
 
 export type TrackingData = z.infer<typeof trackingDataSchema>;

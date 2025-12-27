@@ -142,6 +142,15 @@ if (process.env.VERCEL !== "1") {
 
 // Export for Vercel
 export default async (req: any, res: any) => {
-  await setupPromise;
-  app(req, res);
+  try {
+    await setupPromise;
+    app(req, res);
+  } catch (err: any) {
+    console.error("Critical error in Vercel function:", err);
+    res.status(500).type('text/html').send(`
+      <h1>Critical Server Error</h1>
+      <pre>${err.message}</pre>
+      <pre>${err.stack}</pre>
+    `);
+  }
 };
